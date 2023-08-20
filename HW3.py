@@ -1,5 +1,4 @@
 from copy import deepcopy
-
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -227,9 +226,10 @@ def plot_cis_trans_gene_position(chr_df, max_pos_ser, data_name):
 def HW3_module(genotypes_file, geo_data, mgi_file, data_name):
     data_name = f'{data_name} Dataset'
     strains = mean_data(geo_data)
-    genotypes = filtering(genotypes_file, strains.columns[1:])
+    genotypes = filtering(genotypes_file, strains.columns)
 
     p_vals = association_model(genotypes, strains)  ## Takes a long time, csv attached and imported in the line below:
+    p_vals.to_csv(f'{data_name} Association Model.csv')
     # p_vals = pd.read_csv("after association test.csv", index_col=[0])
 
     loci = p_vals.columns

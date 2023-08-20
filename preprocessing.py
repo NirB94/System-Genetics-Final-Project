@@ -31,7 +31,7 @@ def process_GEO(accession, tissue):
 
 def assign_tables(gsms_items, tissue):
     """This is a helper function for process_GEO.
-    The function receives a class_dict object and a tissue name.
+    The function receives a dict_items object and a tissue name.
     The function concat the tables created for each sample in the gsms_items object.
     The function filters out all samples that are not 'BXD'.
     The function returns the combined tables as a single DataFrame."""
