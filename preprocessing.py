@@ -26,6 +26,7 @@ def process_GEO(accession, tissue):
     else:
         geo_table['BXD11'] = geo_table[['BXD11', 'BXD11TY']].mean(axis=1)
         geo_table.drop('BXD11TY', inplace=True, axis=1)
+    geo_table.rename({gene_ID: 'data'}, axis=1, inplace=True)
     return geo_table
 
 

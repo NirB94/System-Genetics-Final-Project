@@ -22,10 +22,16 @@ def filtering(genotypes, strains):
 
 def mean_data(table):
     cols_set = {col.split('_')[0] for col in table.columns if 'BXD' in col}
+    table.reset_index(inplace=True)
+    new_cols = ['data']
+    new_cols.extend(table.columns[1:])
+    table.columns = new_cols
     means_table = pd.DataFrame({'data': table['data']})
+    table.index = table['data']
+    table.drop('data', axis=1, inplace=True)
     for strain in cols_set:
         temp_cols = [col for col in table.columns if col.split('_')[0] == strain]
-        means_table[strain] = table[temp_cols].mean(axis=1)
+        means_table[strain] = (table[temp_cols].mean(axis=1)).to_list()
     sorted_cols = list(table.columns[:1])
     sorted_cols.extend(sorted(means_table.columns[1:], key=lambda x: int(x[3:])))
     means_table = means_table[sorted_cols]
@@ -39,12 +45,14 @@ def association_model(genotypes_df, expression_df, alpha=0.05):
     for i in range(len(expression_df)):
         p_vals_list = []
         phe = expression_df.iloc[i]
+        data = phe['data']
         for index in genotypes_df.index:
             gen = genotypes_df.loc[index]
             non_others_indexes = gen[(((gen == 'B') | (gen == 'D')) | (gen == 'H'))].index
             gen, phe = gen[non_others_indexes], phe[non_others_indexes].astype(float)
             gen = gen.map({'B': 2, 'H': 1, 'D': 0}).astype(int)
             p_vals_list.append(lrs(gen, phe)[3])
+        phe['data'] = data
         strains_dict[phe['data']] = p_vals_list
     raw_mat = pd.DataFrame(strains_dict)
     raw_mat = raw_mat.T
@@ -226,15 +234,16 @@ def plot_cis_trans_gene_position(chr_df, max_pos_ser, data_name):
 def HW3_module(genotypes_file, geo_data, mgi_file, data_name):
     data_name = f'{data_name} Dataset'
     strains = mean_data(geo_data)
-    genotypes = filtering(genotypes_file, strains.columns)
+    genotypes = filtering(genotypes_file, strains.columns[1:])
 
     p_vals = association_model(genotypes, strains)  ## Takes a long time, csv attached and imported in the line below:
-    p_vals.to_csv(f'{data_name} Association Model.csv')
-    # p_vals = pd.read_csv("after association test.csv", index_col=[0])
+    p_vals.to_csv(f'Association Model of {data_name}.csv')
+    # p_vals = pd.read_csv(f"Association Model of {data_name}.csv", index_col=[0])
 
     loci = p_vals.columns
 
     relevant, loc2 = create_gene_map_loc(mgi_file, p_vals)
+    relevant.dropna(inplace=True)
 
     cis_trans_df = cis_trans_for_all_loci(relevant, genotypes, loci)
 

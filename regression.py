@@ -17,15 +17,14 @@ def create_phenotype_df(file_path, phenotype_id):
 # question 2a
 
 
-def regression_model(phenotype_df, filtered_genotype, name):
+def regression_model(phenotype_df, filtered_genotype):
     phenotype_index = phenotype_df.index[5:]
     genotype_snps = filtered_genotype[filtered_genotype.columns[filtered_genotype.columns.isin(phenotype_index)]]
     phenotype_df = phenotype_df.loc[phenotype_index]
     p_vals = np.array(
-        [calculate_regression(genotype_snps.loc[i], phenotype_df) for i in range(genotype_snps.shape[0])])
+        [calculate_regression(genotype_snps.iloc[i], phenotype_df) for i in range(genotype_snps.shape[0])])
     results_df = pd.DataFrame({'Locus': filtered_genotype["Locus"],
                                'Chr': filtered_genotype["Chr_Build37"], 'P_value': p_vals})
-    results_df.to_excel(f"{name} regression model.xls")
     return results_df
 
 
@@ -61,18 +60,20 @@ def create_manhattan_plot(df, name):
     df = df.sort_values('Chr')
     df.reset_index(inplace=True, drop=True)
     df['i'] = df.index
-    plot = sns.relplot(data=df, x='i', y='-log_P_value', aspect=3.5, hue='Chr', palette='bright')
+    plot = sns.relplot(data=df, x='i', y='-log(P_value)', aspect=3.5, hue='Chr', palette='bright')
     chr_df = df.groupby('Chr')['i'].median()
     plot.ax.set_xlabel('Chromosome Number')
     plot.ax.set_xticks(chr_df)
     plot.ax.set_xticklabels(chr_df.index)
     plot.fig.suptitle(f'{name} Manhattan plot')
-    plt.savefig(f'{name} Manhattan plot.png')
+    name = name.replace('/', ' ')
+    name = name.split('for ')[-1]
+    plt.savefig(f"{name} Manhattan plot.png")
     plt.show()
 
 
 def best_score_snp(df):
-    best_snp = df[df['-log_P_value'] == max(df['-log_P_value'])]
+    best_snp = df[df['-log(P_value)'] == max(df['-log(P_value)'])]
     print(best_snp)
 
 

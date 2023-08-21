@@ -13,11 +13,12 @@ import time
 GENOTYPES = 'genotypes.xls'
 PHENOTYPE_PATH = 'phenotypes.xls'
 MGI = 'MGI_Coordinates.Build37.rpt.txt'
-PHENOTYPES = {"Cocaine response (10 mg/kg ip), locomotion from 0-15 min after first injection in an activity chamber "
-               "for males [cm]": 1109, "Cocaine response (10 mg/kg ip), locomotion from 15-30 min after first"
-                                         " injection in an activity chamber for males [cm]": 1110,
-              "Cocaine response (10 mg/kg ip), locomotion"
-               " from 30-45 min after first injection in an activity chamber for males [cm]": 1111}
+PHENOTYPES = {"Morphine response (50 mg/kg ip), locomotion (open field) from 45-60 min after injection in an activity"
+              " chamber for males [cm]": 970,
+              "Morphine response (50 mg/kg ip), locomotion (open field) from 45-60 min after injection in an activity"
+              " chamber for females [cm]": 1224,
+              "Morphine response (50 mg/kg ip), locomotion (open field) from 45-60 min after injection in an activity"
+              " chamber for males and females [cm]": 1478}
 
 
 ### REGRESSION ###
@@ -27,11 +28,12 @@ def calculate_qtls(genotypes, phenotypes_path):
     for name, ID in PHENOTYPES.items():
         phenotype = regression.create_phenotype_df(phenotypes_path, ID)
         filtered_genotypes = HW3.filtering(genotypes, extract_strains(phenotype))
-        p_vals = regression.regression_model(phenotype, filtered_genotypes, name)
+        p_vals = regression.regression_model(phenotype, filtered_genotypes)
         p_vals['phenotype'] = ID
         p_vals_per_phenotype[name] = p_vals
 
     correction_df = pd.concat([p_vals_per_phenotype[key] for key in p_vals_per_phenotype.keys()])
+    correction_df.fillna(1, inplace=True)
     correction_df['P_value'] = fdrcorrection(correction_df['P_value'], 0.05)[1]
 
     for name, ID in PHENOTYPES.items():
@@ -59,8 +61,7 @@ def all_manhattan_plots(phenotypes_p_vals_df):
 def remove_insignificant(regression_dict):
     for phenotype in regression_dict.keys():
         temp_df = regression_dict[phenotype]
-        temp_df = temp_df[temp_df['P_value'] <= 0.05]
-        regression_dict[phenotype] = temp_df
+        regression_dict[phenotype] = temp_df[temp_df['P_value'] <= 0.05]
     return regression_dict
 
 
@@ -85,10 +86,13 @@ if __name__ == '__main__':
     all_manhattan_plots(regression_model_for_all_phenotypes)
     regression_model_for_all_phenotypes = remove_insignificant(regression_model_for_all_phenotypes)
 
-    ### Section 4 remainings:
-    ### Bug in calculate_qtls: filtered genotypes returns empty and there's no 'Locus' column to use!
-    ### Need to figure out how to overcome this.
-    ### Then - Build Triplets (For section 5)
+    ### Section 4 COMPLETED!
+
+    ### Section 3 remaining:
+    ### Calculate cis-trans: ADD a way to find eQTLS that act both as cis AND trans.
+    ### Make sure rest of module works fine.
+    ### Write in word file
+    ### Continue to triplets (Section 5).
 
 
     t1 = time.time()
