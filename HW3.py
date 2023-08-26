@@ -32,7 +32,7 @@ def mean_data(table):
     for strain in cols_set:
         temp_cols = [col for col in table.columns if col.split('_')[0] == strain]
         means_table[strain] = (table[temp_cols].mean(axis=1)).to_list()
-    sorted_cols = list(table.columns[:1])
+    sorted_cols = list(means_table.columns[:1])
     sorted_cols.extend(sorted(means_table.columns[1:], key=lambda x: int(x[3:])))
     means_table = means_table[sorted_cols]
     return means_table
@@ -45,18 +45,19 @@ def association_model(genotypes_df, expression_df, alpha=0.05):
     for i in range(len(expression_df)):
         p_vals_list = []
         phe = expression_df.iloc[i]
-        data = phe['data']
+        data = phe.name
         for index in genotypes_df.index:
             gen = genotypes_df.loc[index]
             non_others_indexes = gen[(((gen == 'B') | (gen == 'D')) | (gen == 'H'))].index
-            gen, phe = gen[non_others_indexes], phe[non_others_indexes].astype(float)
+            gen = gen[non_others_indexes]
+            phe = expression_df[non_others_indexes].iloc[i].astype(float)
             gen = gen.map({'B': 2, 'H': 1, 'D': 0}).astype(int)
             p_vals_list.append(lrs(gen, phe)[3])
         phe['data'] = data
         strains_dict[phe['data']] = p_vals_list
     raw_mat = pd.DataFrame(strains_dict)
     raw_mat = raw_mat.T
-    raw_mat.index = expression_df['data']
+    raw_mat.index = expression_df.index
     raw_mat.columns = genotypes_df.index
     stacked = raw_mat.stack()
     stacked = pd.Series(fdrcorrection(stacked, 0.05)[1], index=stacked.index)
@@ -65,7 +66,8 @@ def association_model(genotypes_df, expression_df, alpha=0.05):
     final_mat['min_p_val'] = final_mat.min(axis=1)
     final_mat = final_mat[final_mat['min_p_val'] < alpha]
     final_mat.drop('min_p_val', axis='columns', inplace=True)
-    final_mat.set_index('data', inplace=True)
+    final_mat.set_index(final_mat.columns[0], inplace=True)
+    final_mat.index.rename('data', inplace=True)
     return final_mat
 
 
@@ -109,12 +111,26 @@ def cis_trans_for_all_loci(genes, genotypes_df, every_loci):
 def count_significant_cis_trans(p_values, cis_trans_s):
     combined = pd.DataFrame(p_values.unstack().rename('p_values')).join(
         cis_trans_s.rename_axis('data').unstack().rename('cis-trans'))
-    counts_df = pd.DataFrame(combined.loc[combined.p_values <= 0.05, 'cis-trans']).reset_index()
+    combined.dropna(inplace=True)
+    counts_df = combined.loc[combined.p_values <= 0.05, 'cis-trans'].reset_index()
     counts_df.rename({'level_0': 'snp'}, axis=1, inplace=True)
     val_counts = counts_df['cis-trans'].value_counts()
-    counts_dict = {'Significant': val_counts['trans'] + val_counts['cis'], 'Cis': val_counts['cis'],
+    counts_dict = {'eQTLS': counts_df.nunique()[0], 'Significant P-values': val_counts['trans'] + val_counts['cis'], 'Cis': val_counts['cis'],
                    'Trans': val_counts['trans']}
-    return counts_df, counts_dict
+    three_counts = counts_df.groupby('snp')['cis-trans'].apply(pd.value_counts).to_frame()
+    three_counts_indices = list(set([i[0] for i in three_counts.index]))
+    both_list = []
+    cis_list = []
+    trans_list = []
+    for index in three_counts_indices:
+        if len(three_counts.loc[index]) == 2:
+            both_list.append(index)
+        elif three_counts.loc[index].index == 'trans':
+            trans_list.append(index)
+        else:
+            cis_list.append(index)
+    cis_trans_both = {'Both Cis and Trans': both_list, 'Cis': cis_list, 'Trans': trans_list}
+    return counts_df, counts_dict, cis_trans_both
 
 
 def eQTL_association_df(p_values, filtered_genotypes_df):
@@ -141,7 +157,6 @@ def plot_eQTL(eQTL_df, data_name):
     plot.ax.set_xticks(chrom_df)
     plot.ax.set_xticklabels(chrom_df.index)
     plot.fig.suptitle('Number of genes associated with each eQTL')
-    plot.set(yticks=[i for i in range(0, 4)])
     plt.savefig(f'Number of genes associated with each eQTL in {data_name}.png')
     plt.show()
 
@@ -194,8 +209,8 @@ def find_max_pos(chr_data):
 
 def reg_location(df, max_pos_ser, is_gene=True):
     form = 'gene' if is_gene else 'snp'
-    for i in range(len(df)):
-        df.loc[i, f'normalized location of {form}'] = calc_reg_loc(df.iloc[i], max_pos_ser, form)
+    for i in list(df.index):
+        df.loc[i, f'normalized location of {form}'] = calc_reg_loc(df.loc[i], max_pos_ser, form)
     return df
 
 
@@ -233,12 +248,11 @@ def plot_cis_trans_gene_position(chr_df, max_pos_ser, data_name):
 
 def HW3_module(genotypes_file, geo_data, mgi_file, data_name):
     data_name = f'{data_name} Dataset'
-    strains = mean_data(geo_data)
-    genotypes = filtering(genotypes_file, strains.columns[1:])
+    genotypes = filtering(genotypes_file, geo_data)
 
-    p_vals = association_model(genotypes, strains)  ## Takes a long time, csv attached and imported in the line below:
-    p_vals.to_csv(f'Association Model of {data_name}.csv')
-    # p_vals = pd.read_csv(f"Association Model of {data_name}.csv", index_col=[0])
+#     p_vals = association_model(genotypes, strains)  ## Takes a long time, csv attached and imported in the line below:
+#     p_vals.to_csv(f'Association Model of {data_name}.csv')
+    p_vals = pd.read_csv(f"Association Model of {data_name}.csv", index_col=[0])
 
     loci = p_vals.columns
 
@@ -251,7 +265,13 @@ def HW3_module(genotypes_file, geo_data, mgi_file, data_name):
     counts = count_significant_cis_trans(p_vals, cis_trans_df)
     sig = counts[0]
     counts_val = counts[1]
-    print(f"Significant, cis and trans counts in {data_name}:\n", counts_val)
+    cis_trans_both_counts = counts[2]
+    print(f"eQTLS, Significant P-values, cis and trans counts in {data_name}:\n", counts_val)
+    for key in cis_trans_both_counts.keys():
+        print(f"eQTLS that are acting as {key}: {len(cis_trans_both_counts[key])}")
+    len_of_cis_trans_both_counts = {key: len(cis_trans_both_counts[key]) for key in cis_trans_both_counts.keys()}
+    pd.DataFrame(len_of_cis_trans_both_counts, index=[0]).T.rename({0: 'Counts'}, axis=1).plot(kind='bar', title=f'Cis-Trans Significant eQTLS counts on {data_name}', rot=0)
+    plt.savefig(f'Cis-Trans Significant eQTLS counts on {data_name}.png')
 
     ### Question 2 ###
     eQTL = eQTL_association_df(p_vals, genotypes)
