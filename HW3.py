@@ -291,4 +291,4 @@ def HW3_module(genotypes_file, geo_data, mgi_file, data_name):
     gene_snp_locations = reg_location(gene_snp_locations, max_pos)
     gene_snp_locations = reg_location(gene_snp_locations, max_pos, is_gene=False)
     plot_cis_trans_gene_position(gene_snp_locations, max_pos, data_name)
-    return gene_snp_locations['snp name']
+    return genotypes, gene_snp_locations

@@ -8,6 +8,7 @@ from statsmodels.stats.multitest import fdrcorrection
 import preprocessing as pp
 import HW3
 import regression
+import CausalityAnalysis as ca
 import time
 
 GENOTYPES = 'genotypes.xls'
@@ -19,7 +20,7 @@ PHENOTYPES = {"Morphine response (50 mg/kg ip), locomotion (open field) from 45-
               " chamber for females [cm]": 1224,
               "Morphine response (50 mg/kg ip), locomotion (open field) from 45-60 min after injection in an activity"
               " chamber for males and females [cm]": 1478}
-
+REVERSE_PHENOTYPES = {value: key for key, value in PHENOTYPES.items()}
 
 ### REGRESSION ###
 
@@ -65,34 +66,69 @@ def remove_insignificant(regression_dict):
     return regression_dict
 
 
+def get_key(value, dic):
+    for key in dic.keys():
+        if dic[key] == value:
+            return key
+    return None
+
 
 if __name__ == '__main__':
     t0 = time.time()
     liver_accession = 'GSE17522'
     hypothalamus_accession = 'GSE36674'
-    genotypes = pd.read_excel(GENOTYPES, skiprows=1)
+    genotypes = pd.read_excel(GENOTYPES, skiprows=1).drop(0, axis=1)
     mgi = pd.read_csv(MGI, sep='\t', header=0)
 
     ### Section 2 ###
-    hypo_processed_data = pp.run_preprocessing(hypothalamus_accession, liver=False)
-    liver_processed_data = pp.run_preprocessing(liver_accession)
+    print("Beginning Section 2")
+    # hypo_processed_data = pp.run_preprocessing(hypothalamus_accession, liver=False)
+    # liver_processed_data = pp.run_preprocessing(liver_accession)
+    hypo_processed_data = pd.read_csv('Hypothalamus_data_after_processing.csv', index_col=[0])
+    liver_processed_data = pd.read_csv('Liver_data_after_processing.csv', index_col=[0])
 
     ### Section 3 ###
-    hypo_significant_eQTLs = HW3.HW3_module(genotypes, hypo_processed_data, mgi, "Hypothalamus")
-    liver_significant_eQTLs = HW3.HW3_module(genotypes, liver_processed_data, mgi, "Liver")
+    print("Beginning Section 3")
+    hypo_filtered_genotypes, hypo_significant_genes_and_eQTLs = HW3.HW3_module(genotypes, hypo_processed_data, mgi, "Hypothalamus")
+    liver_filtered_genotypes, liver_significant_genes_and_eQTLs = HW3.HW3_module(genotypes, liver_processed_data, mgi, "Liver")
 
     ### Section 4 ###
+    print("Beginning Section 4")
     regression_model_for_all_phenotypes = calculate_qtls(genotypes, PHENOTYPE_PATH)
     all_manhattan_plots(regression_model_for_all_phenotypes)
     regression_model_for_all_phenotypes = remove_insignificant(regression_model_for_all_phenotypes)
 
-    ### Section 4 COMPLETED!
+    ### Section 5 ###
+    print("Beginning Section 5")
+    hypo_close_columns = hypo_significant_genes_and_eQTLs['gene chromosome'] == hypo_significant_genes_and_eQTLs['snp chromosome']
+    hypo_significant_genes_and_eQTLs = hypo_significant_genes_and_eQTLs[hypo_close_columns]
+    liver_close_columns = liver_significant_genes_and_eQTLs['gene chromosome'] == liver_significant_genes_and_eQTLs['snp chromosome']
+    liver_significant_genes_and_eQTLs = liver_significant_genes_and_eQTLs[liver_close_columns]
+    combined_hypo_data = hypo_significant_genes_and_eQTLs.merge(hypo_filtered_genotypes, how='inner', right_index=True,
+                                                                left_on='snp name')
+    combined_liver_data = liver_significant_genes_and_eQTLs.merge(liver_filtered_genotypes, how='inner',
+                                                                  right_index=True, left_on='snp name')
+    combined_hypo_data_compressed = combined_hypo_data[['Locus', 'gene name', 'snp name']]
+    combined_liver_data_compressed = combined_liver_data[['Locus', 'gene name', 'snp name']]
+    compressed = [combined_hypo_data_compressed, combined_liver_data_compressed]
+    triplets_datasets = []
+    for combined_data in compressed:
+        df = pd.DataFrame()
+        for phenotype in regression_model_for_all_phenotypes.keys():
+            phe = regression_model_for_all_phenotypes[phenotype]
+            df = pd.concat([df, combined_data.merge(phe, how='inner', on='Locus')])
+        df['phenotype name'] = df['phenotype'].map(REVERSE_PHENOTYPES)
+        triplets_datasets.append(df[['Locus', 'gene name', 'phenotype']])
 
-    ### Section 3 remaining:
-    ### Calculate cis-trans: ADD a way to find eQTLS that act both as cis AND trans.
-    ### Make sure rest of module works fine.
-    ### Write in word file
-    ### Continue to triplets (Section 5).
+    ### Section 6 ###
+    print("Beginning Section 6")
+    hypo_triplets = [tuple(triplets_datasets[0].iloc[i]) for i in range(len(triplets_datasets[0]))]
+    liver_triplets = [tuple(triplets_datasets[1].iloc[i]) for i in range(len(triplets_datasets[1]))]
+    hypo_cause_test = ca.causality_model(hypo_triplets, hypo_processed_data)
+    liver_cause_test = ca.causality_model(liver_triplets, liver_processed_data)
+    print("Hypothalamus causality Analysis: \n", hypo_cause_test)
+    print("Liver causality Analysis: \n", liver_cause_test)
+
 
 
     t1 = time.time()
