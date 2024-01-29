@@ -75,9 +75,3 @@ def create_manhattan_plot(df, name):
 def best_score_snp(df):
     best_snp = df[df['-log(P_value)'] == max(df['-log(P_value)'])]
     print(best_snp)
-
-
-# def main(phenotype_number):
-#     p_vals_log10 = regression_model(phenotype_number, "./phenotypes.xls", "./genotypes.xls")
-#     create_manhattan_plot(p_vals_log10)
-#     best_score_snp(p_vals_log10)

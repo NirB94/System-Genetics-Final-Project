@@ -1,15 +1,10 @@
-import GEOparse
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-import scipy.stats as st
 from statsmodels.stats.multitest import fdrcorrection
 import preprocessing as pp
 import HW3
 import regression
 import CausalityAnalysis as ca
-import time
 
 GENOTYPES = 'genotypes.xls'
 PHENOTYPE_PATH = 'phenotypes.xls'
@@ -22,7 +17,6 @@ PHENOTYPES = {"Morphine response (50 mg/kg ip), locomotion (open field) from 45-
               " chamber for males and females [cm]": 1478}
 REVERSE_PHENOTYPES = {value: key for key, value in PHENOTYPES.items()}
 
-### REGRESSION ###
 
 def calculate_qtls(genotypes, phenotypes_path):
     p_vals_per_phenotype = dict()
@@ -74,7 +68,6 @@ def get_key(value, dic):
 
 
 if __name__ == '__main__':
-    t0 = time.time()
     liver_accession = 'GSE17522'
     hypothalamus_accession = 'GSE36674'
     genotypes = pd.read_excel(GENOTYPES, skiprows=1).drop(0, axis=1)
@@ -82,7 +75,7 @@ if __name__ == '__main__':
 
     ### Section 2 ###
     print("Beginning Section 2")
-    # hypo_processed_data = pp.run_preprocessing(hypothalamus_accession, liver=False)
+    # hypo_processed_data = pp.run_preprocessing(hypothalamus_accession, liver=False)  # Provided as pre-prepared files.
     # liver_processed_data = pp.run_preprocessing(liver_accession)
     hypo_processed_data = pd.read_csv('Hypothalamus_data_after_processing.csv', index_col=[0])
     liver_processed_data = pd.read_csv('Liver_data_after_processing.csv', index_col=[0])
@@ -128,8 +121,3 @@ if __name__ == '__main__':
     liver_cause_test = ca.causality_model(liver_triplets, liver_processed_data)
     print("Hypothalamus causality Analysis: \n", hypo_cause_test)
     print("Liver causality Analysis: \n", liver_cause_test)
-
-
-
-    t1 = time.time()
-    print("Time took:\n", (t1-t0)/60, "minutes")
