@@ -1,4 +1,4 @@
-System Genetics - final project
+# System Genetics - Final Project
 
 In this project we were assigned to combine genes and intermediate phenotypes to discover noval findings.
 The project was submitted as the final assignment for this course.
